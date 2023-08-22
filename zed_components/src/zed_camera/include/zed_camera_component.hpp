@@ -22,6 +22,8 @@
 #include "sl_types.hpp"
 #include "visibility_control.hpp"
 
+#include <atomic>
+
 namespace stereolabs
 {
 
@@ -265,11 +267,11 @@ private:
   bool mSvoRealtime = false;
   int mVerbose = 1;
   int mGpuId = -1;
-  sl::RESOLUTION mCamResol = sl::RESOLUTION::HD720;  // Default resolution: RESOLUTION_HD720
-  PubRes mPubResolution = MEDIUM;  // Use native DNN resolution for NEURAL depth to improve speed and quality.
-  sl::DEPTH_MODE mDepthMode = sl::DEPTH_MODE::PERFORMANCE;  // Default depth mode: DEPTH_MODE_PERFORMANCE
-  bool mDepthDisabled =
-    false;  // Indicates if depth calculation is not required (DEPTH_MODE::NONE se for )
+  sl::RESOLUTION mCamResol = sl::RESOLUTION::HD1080;  // Default resolution: RESOLUTION_HD1080
+  PubRes mPubResolution = PubRes::NATIVE;   // Use native grab resolution by default
+  double mCustomDownscaleFactor = 1.0; // Used to rescale data with user factor
+  sl::DEPTH_MODE mDepthMode = sl::DEPTH_MODE::ULTRA;  // Default depth mode: ULTRA
+  bool mDepthDisabled = false;  // Indicates if depth calculation is not required (DEPTH_MODE::NONE)
   int mDepthStabilization = 1;
   std::vector<std::vector<float>> mRoiParam;
   int mCamTimeoutSec = 5;
@@ -305,7 +307,16 @@ private:
   bool mPublishPoseCov = true;
   bool mGnssFusionEnabled = false;
   std::string mGnssTopic = "/gps/fix";
+#if (ZED_SDK_MINOR_VERSION == 0 && ZED_SDK_PATCH_VERSION < 6)
   double mGnssInitDistance = 5.0;
+#elif (ZED_SDK_MINOR_VERSION == 0 && ZED_SDK_PATCH_VERSION >= 6)
+  bool mGnssEnableReinitialization = true;
+  bool mGnssEnableRollingCalibration = true;
+  bool mGnssEnableTranslationUncertaintyTarget = false;
+  double mGnssVioReinitThreshold = 5.0;
+  double mGnssTargetTranslationUncertainty = 10e-2;
+  double mGnssTargetYawUncertainty = 0.1;
+#endif
   bool mGnssZeroAltitude = false;
   bool mPublishUtmTf = true;
   bool mUtmAsParent = true;
@@ -342,6 +353,11 @@ private:
   double mBodyTrkPredTimeout = 0.5;
   double mBodyTrkConfThresh = 50.0;
   int mBodyTrkMinKp = 10;
+
+  #if (ZED_SDK_MINOR_VERSION == 0 && ZED_SDK_PATCH_VERSION >= 6)
+  double mPdMaxDistanceThreshold = 0.15;
+  double mPdNormalSimilarityThreshold = 15.0;
+  #endif
 
   // TODO(Walter) remove QoS parameters, use instead the new ROS2 Humble QoS settings engine
 
@@ -460,6 +476,10 @@ private:
   bool mCamera2BaseTransfValid = false;
   bool mGnss2BaseTransfValid = false;
   bool mMap2UtmTransfValid = false;
+
+  std::atomic_uint16_t mAiInstanceID;
+  uint16_t mObjDetInstID;
+  uint16_t mBodyTrkInstID;
   // <---- TF Transforms Flags
 
   // ----> Messages (ONLY THOSE NOT CHANGING WHILE NODE RUNS)
@@ -610,7 +630,13 @@ private:
   bool mPosTrackingReady = false;
   sl::POSITIONAL_TRACKING_STATE mPosTrackingStatusWorld;
   sl::POSITIONAL_TRACKING_STATE mPosTrackingStatusCamera;
+
+#if (ZED_SDK_MINOR_VERSION == 0 && ZED_SDK_PATCH_VERSION < 6)
   sl::POSITIONAL_TRACKING_STATE mGeoPoseStatus;
+#elif (ZED_SDK_MINOR_VERSION == 0 && ZED_SDK_PATCH_VERSION >= 6)
+  sl::GNSS_CALIBRATION_STATE mGeoPoseStatus;
+#endif
+
   bool mResetOdom = false;
   bool mSpatialMappingRunning = false;
   bool mObjDetRunning = false;
